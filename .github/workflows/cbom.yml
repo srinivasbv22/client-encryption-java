@@ -1,0 +1,57 @@
+name: Generate CBOM
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '0 0 * * 1'  # Run weekly on Mondays
+
+jobs:
+  analyze:
+    name: Generate Crypto Bill of Materials
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v2
+        with:
+          languages: java
+          
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+
+      - name: Build with Maven
+        run: mvn clean compile
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v2
+        with:
+          category: "/language:java"
+
+      - name: Generate CBOM
+        uses: advanced-security/cbom-action/analyze@main
+        with:
+          language: java
+          createCodeQLDatabaseIfRequired: true
+          uploadToCodeScanning: true
+
+      - name: Upload CBOM Results
+        uses: actions/upload-artifact@v3
+        with:
+          name: cbom-results
+          path: ${{ github.workspace }}/cbom-results
+
+      - name: Add CBOM Summary
+        uses: advanced-security/cbom-action/workflow-summary@main
